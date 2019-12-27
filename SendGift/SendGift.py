@@ -1,16 +1,27 @@
 import json
 import pymysql
 import stripe
+import plaid
 
 def lambda_handler(event, context):
     print(event)
     print(event["body"])
     body = json.loads(event["body"])
+    
     rds_host  = "gifty-instance.c8dmkikrr98g.us-east-2.rds.amazonaws.com"
     name = "admin"
     password = "Matt1234"
     db_name = "Gifty"
     conn = pymysql.connect(rds_host, user=name, passwd=password, database=db_name, connect_timeout=5, autocommit=True)
+    
+    PLAID_CLIENT_ID="5da75fda7e517c0013053c50"
+    PLAID_SECRET="d5e85fc65bace5c0b03e3db352bc78"
+    PLAID_PUBLIC_KEY="72a81b8e9f3672dbfd85efc24eb0f8"
+    PLAID_ENV="sandbox"
+    client = plaid.Client(client_id = PLAID_CLIENT_ID, secret=PLAID_SECRET, public_key=PLAID_PUBLIC_KEY, environment=PLAID_ENV, api_version='2019-05-29')
+
+    stripe.api_key = "sk_test_8806eSVvnDhb9FvJjZKiEo4D00r8tYx1M9"
+
     try:
         cursor = conn.cursor()
         # cursor.execute("Create TABLE Gifts(id INT NOT NULL AUTO_INCREMENT, toId varchar(20), fromId varchar(20), vendor varchar(50), paymentId varchar(50), caption varchar(280), amount decimal(5,2), remaining decimal(5,2), PRIMARY KEY (id)) ")
@@ -30,13 +41,14 @@ def lambda_handler(event, context):
         else:
             # if card: get access token and stripe token, charge card
             # TODO: fix - generate new stripe token using plaid
-            sqlCommand = "SELECT stripeToken FROM Accounts where accountId = '" + body["paymentId"] + "'"
+            sqlCommand = "SELECT accessToken FROM Accounts where accountId = '" + body["paymentId"] + "'"
             cursor.execute(sqlCommand)
             row = cursor.fetchone()
-            stripeToken = row[0]
+            accessToken = row[0]
+            stripeResponse = client.Processor.stripeBankAccountTokenCreate(accessToken, body["paymentId"])
+            stripeToken = stripeResponse['stripe_bank_account_token']
             print(stripeToken)
             
-            stripe.api_key = "sk_test_8806eSVvnDhb9FvJjZKiEo4D00r8tYx1M9"
             charge = stripe.Charge.create(
                 amount=body["amount"]*100, # Stripe takes the amount in cents
                 currency="usd",
@@ -52,7 +64,7 @@ def lambda_handler(event, context):
         cursor.execute(sqlCommand)
         print("SUCCESS")
     except Exception as e:
-        print("ERROR")
+        print("ERROR: " + str(e))
     finally:
         conn.close()
 

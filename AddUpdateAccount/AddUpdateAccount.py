@@ -1,6 +1,7 @@
 import json
 import pymysql
 import plaid
+import stripe
 
 def lambda_handler(event, context):
     print(event)
@@ -19,10 +20,20 @@ def lambda_handler(event, context):
     PLAID_ENV="sandbox"
     client = plaid.Client(client_id = PLAID_CLIENT_ID, secret=PLAID_SECRET, public_key=PLAID_PUBLIC_KEY, environment=PLAID_ENV, api_version='2019-05-29')
 
+    STRIPE_API_KEY = "sk_test_8806eSVvnDhb9FvJjZKiEo4D00r8tYx1M9"
+    stripe.api_key = STRIPE_API_KEY
+
     try:
         cursor = conn.cursor()
         # cursor.execute("Create TABLE Accounts(user varchar(50), phone varchar(20), bank varchar(50), accessToken varchar(100),stripeToken varchar(50),accountId varchar(50),accountMask varchar(4),accountName varchar(50),accountType varchar(50),accountSubtype varchar(50)) ")
         
+        # Get stripe connected account for user
+        sqlCommand = "SELECT stripeAccount from Balance where userId = '" + body["username"] + "'"
+        cursor.execute(sqlCommand)
+        row = cursor.fetchone()
+        stripeAccount = row[0]
+        print("Stripe account for user is " + stripeAccount)
+
         # TODO: if bank already exists for user, just update accessToken
         response = client.Item.public_token.exchange(body["accessToken"])
         accessToken = response['access_token']
@@ -30,10 +41,19 @@ def lambda_handler(event, context):
         
         accounts = body["accounts"]
         for account in accounts:
-            stripeResponse = client.Processor.stripeBankAccountTokenCreate(accessToken, account["id"])
-            stripeToken = stripeResponse['stripe_bank_account_token']
-            # TODO: if accessToken is not sandbox, use stripe token to modify connected account with bank account
-            
+            # if accessToken is not sandbox, use stripe token to modify connected account with bank account
+            if "test" in STRIPE_API_KEY:
+                print("Cannot use stripe modify connected account in test mode. " + body["bankName"] + " " + account["subtype"] + " account will not be added to connected account.")
+            else:
+                stripeResponse = client.Processor.stripeBankAccountTokenCreate(accessToken, account["id"])
+                stripeToken = stripeResponse['stripe_bank_account_token']
+                resp = stripe.Account.modify(
+                    stripeAccount,
+                    external_account=stripeToken
+                )
+                print(resp)
+
+
             sqlCommand = sqlCommand + "('%s','%s','%s','%s','%s','%s','%s','%s','%s')," % \
                 (body["username"], body["phone"], body["bankName"], accessToken, account["id"], account["mask"], account["name"], account["type"], account["subtype"])
         sqlCommand = sqlCommand[:-1] + ";"
