@@ -13,7 +13,7 @@ def lambda_handler(event, context):
         cursor = conn.cursor()
         #cursor.execute("SHOW columns FROM Gifts")
         #print([column[0] for column in cursor.fetchall()])
-        sqlCommand = "SELECT * FROM Gifts WHERE toID = '" + body["phoneNumber"] + "'"
+        sqlCommand = "SELECT id,vendor,caption,remaining,fromId FROM Gifts WHERE toID = '" + body["phoneNumber"] + "'"
         print(sqlCommand)
         cursor.execute(sqlCommand)
         rows = cursor.fetchall()
@@ -21,7 +21,7 @@ def lambda_handler(event, context):
         gifts = []
         for row in rows:
             print(row)
-            gift = {"id": row[0], "vendor": row[3], "caption": row[5], "remainingBalance": str(row[7]), "fromId": row[2]}
+            gift = {"id": row[0], "vendor": row[1], "caption": row[2], "remainingBalance": str(row[3]), "fromId": row[4]}
             gifts.append(gift)
         print(gifts)
         print("SUCCESS")
