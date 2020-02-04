@@ -4,6 +4,7 @@ import pymysql
 def lambda_handler(event, context):
     print(event)
     body = json.loads(event["body"])
+
     rds_host  = "gifty-instance.c8dmkikrr98g.us-east-2.rds.amazonaws.com"
     name = "admin"
     password = "Matt1234"
@@ -13,13 +14,16 @@ def lambda_handler(event, context):
     try:
         cursor = conn.cursor()
 
-        balance = 0
-        sqlCommand = "SELECT balance FROM Balance WHERE userId = '" + body["userId"] + "'"
+        # cursor.execute("Create TABLE DeviceTokens(user varchar(50), token varchar(100)) ")
+        # if user already exists replace token
+        cursor.execute("SELECT * FROM DeviceTokens WHERE user = '%s'" % (body["user"]))
+        row_count = cursor.rowcount
+        if row_count == 0:
+            sqlCommand = "INSERT INTO DeviceTokens(user,token) VALUES ('%s','%s')" % (body["user"], body["token"])
+        else:
+            sqlCommand = "UPDATE DeviceTokens set token = '" + body["token"] + "' where user = '" + body["user"] + "'"
         print(sqlCommand)
         cursor.execute(sqlCommand)
-        row = cursor.fetchone()
-        print(row)
-        balance = row[0]
         print("SUCCESS")
     except Exception as e:
         print("ERROR: " + str(e))
@@ -27,6 +31,5 @@ def lambda_handler(event, context):
         conn.close()
 
     return {
-        'statusCode': 200,
-        'body': balance
+        'statusCode': 200
     }

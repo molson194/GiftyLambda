@@ -19,6 +19,8 @@ def lambda_handler(event, context):
 
     try:
         cursor = conn.cursor()
+        
+        cursor.execute("UPDATE Gifts SET toUser = '" + event["userName"] + "' WHERE toId = '" + attributes["phone_number"] + "';")
 
         resp = stripe.Account.create(
             type="custom",

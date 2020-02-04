@@ -41,18 +41,14 @@ def lambda_handler(event, context):
         
         accounts = body["accounts"]
         for account in accounts:
-            # if accessToken is not sandbox, use stripe token to modify connected account with bank account
-            if "test" in STRIPE_API_KEY:
-                print("Cannot use stripe modify connected account in test mode. " + body["bankName"] + " " + account["subtype"] + " account will not be added to connected account.")
-            else:
-                stripeResponse = client.Processor.stripeBankAccountTokenCreate(accessToken, account["id"])
-                stripeToken = stripeResponse['stripe_bank_account_token']
-                resp = stripe.Account.modify(
-                    stripeAccount,
-                    external_account=stripeToken
-                )
-                print(resp)
 
+            stripeResponse = client.Processor.stripeBankAccountTokenCreate(accessToken, account["id"])
+            stripeToken = stripeResponse['stripe_bank_account_token']
+            resp = stripe.Account.create_external_account(
+                stripeAccount,
+                external_account=stripeToken
+            )
+            print(resp)
 
             sqlCommand = sqlCommand + "('%s','%s','%s','%s','%s','%s','%s','%s','%s')," % \
                 (body["username"], body["phone"], body["bankName"], accessToken, account["id"], account["mask"], account["name"], account["type"], account["subtype"])
